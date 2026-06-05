@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   unbound:
     image: mvance/unbound:latest
@@ -8,7 +6,7 @@ services:
       - "5335:53/udp"
       - "5335:53/tcp"
     volumes:
-      - ./unbound.conf:/opt/unbound/etc/unbound/unbound.conf:ro
+      - ./unbound.conf/unbound.conf:/opt/unbound/etc/unbound/unbound.conf:ro
     networks:
       - dns-stack
     restart: unless-stopped
@@ -25,6 +23,11 @@ services:
     container_name: unbound-exporter
     ports:
       - "9167:9167"
+    volumes:
+      - ./unbound/unbound_server.pem:/etc/unbound/unbound_server.pem:ro
+      - ./unbound/unbound_server.key:/etc/unbound/unbound_server.key:ro
+      - ./unbound/unbound_control.pem:/etc/unbound/unbound_control.pem:ro
+      - ./unbound/unbound_control.key:/etc/unbound/unbound_control.key:ro
     environment:
       UNBOUND_HOST: unbound
       UNBOUND_PORT: 53
@@ -38,8 +41,8 @@ services:
     image: adguard/adguardhome:latest
     container_name: adguardhome
     ports:
-      - "53:53/tcp"
-      - "53:53/udp"
+      - "5454:53/tcp"
+      - "5454:53/udp"
       - "3000:3000/tcp"
       - "80:80/tcp"
       - "443:443/tcp"
