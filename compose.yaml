@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  unbound:
+    image: mvance/unbound:latest
+    container_name: unbound
+    ports:
+      - "5335:53/udp"
+      - "5335:53/tcp"
+    volumes:
+      - ./unbound.conf:/opt/unbound/etc/unbound/unbound.conf:ro
+    networks:
+      - dns-stack
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "dig", "@127.0.0.1", "-p", "53", "google.com"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  unbound-exporter:
+    build:
+      context: https://github.com/letsencrypt/unbound_exporter.git
+    image: letsencrypt/unbound_exporter:latest
+    container_name: unbound-exporter
+    ports:
+      - "9167:9167"
+    environment:
+      UNBOUND_HOST: unbound
+      UNBOUND_PORT: 53
+    depends_on:
+      - unbound
+    networks:
+      - dns-stack
+    restart: unless-stopped
+
+  adguardhome:
+    image: adguard/adguardhome:latest
+    container_name: adguardhome
+    ports:
+      - "53:53/tcp"
+      - "53:53/udp"
+      - "3000:3000/tcp"
+      - "80:80/tcp"
+      - "443:443/tcp"
+    volumes:
+      - adguard-work:/opt/adguardhome/work
+      - adguard-conf:/opt/adguardhome/conf
+    environment:
+      - TZ=UTC
+    networks:
+      - dns-stack
+    restart: unless-stopped
+    depends_on:
+      - unbound
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - dns-stack
+    restart: unless-stopped
+    depends_on:
+      - unbound-exporter
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3001:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_USER=admin
+    networks:
+      - dns-stack
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+networks:
+  dns-stack:
+    driver: bridge
+
+volumes:
+  adguard-work:
+  adguard-conf:
+  prometheus-data:
+  grafana-data:
